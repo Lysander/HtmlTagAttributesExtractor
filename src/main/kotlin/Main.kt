@@ -34,7 +34,7 @@ tailrec fun parseAttributes(
                 lines.drop(1),
                 skip + 1,
                 accu + Attribute(
-                    if (name == "htmlFor") "`for`" else name.lowercase(),
+                    if (name == "htmlFor") "`for`" else name,
                     if (type == "dynamic") "String" else type
                 )
             )
@@ -109,17 +109,18 @@ fun main(args: Array<String>) {
                 appendLine()
                 appendLine("// ${tag.name} attributes")
                 tag.attributes.forEach { (name, type) ->
+                    val htmlAttrName = name.lowercase()
                     when (type) {
                         "Boolean" -> {
-                            appendLine("""fun Tag<${tag.name}>.$name(value: $type, trueValue: String = "") = attr("$name", value, trueValue)""")
-                            appendLine("""fun Tag<${tag.name}>.$name(value: Flow<$type>, trueValue: String = "") = attr("$name", value, trueValue)""")
+                            appendLine("""fun Tag<${tag.name}>.$name(value: $type, trueValue: String = "") = attr("$htmlAttrName", value, trueValue)""")
+                            appendLine("""fun Tag<${tag.name}>.$name(value: Flow<$type>, trueValue: String = "") = attr("$htmlAttrName", value, trueValue)""")
                         }
                         "Comment" -> {
                             appendLine(name)
                         }
                         else -> {
-                            appendLine("""fun Tag<${tag.name}>.$name(value: $type) = attr("$name", value)""")
-                            appendLine("""fun Tag<${tag.name}>.$name(value: Flow<$type>) = attr("$name", value)""")
+                            appendLine("""fun Tag<${tag.name}>.$name(value: $type) = attr("$htmlAttrName", value)""")
+                            appendLine("""fun Tag<${tag.name}>.$name(value: Flow<$type>) = attr("$htmlAttrName", value)""")
                         }
                     }
                 }
