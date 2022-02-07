@@ -1,7 +1,7 @@
 import java.nio.file.Files
 import kotlin.io.path.Path
 
-data class Attribute(val name: String, val type: String) {
+data class Attribute(val name: String, val typeKt: String, val typeHtml: String) {
     companion object {
         val matcher = "var (.+): ([A-Za-z0-9?]+)".toRegex()
     }
@@ -34,8 +34,18 @@ tailrec fun parseAttributes(
                 lines.drop(1),
                 skip + 1,
                 accu + Attribute(
-                    if (name == "htmlFor") "`for`" else name,
-                    if (type == "dynamic") "String" else type
+                    when (name) {
+                        "htmlFor" -> "`for`"
+                        "_object" -> "`object`"
+                        else -> name
+                    },
+                    if (type == "dynamic") "String" else type,
+                    when (name) {
+                        "htmlFor" -> "for"
+                        "`as`" -> "as"
+                        "_object" -> "object"
+                        else -> name
+                    }.lowercase()
                 )
             )
         }
@@ -51,7 +61,13 @@ tailrec fun parseTypes(lines: List<String>, accu: List<HtmlTag> = emptyList()): 
         val (attributes, skip) = parseAttributes(lines.drop(1))
         val parents = parseParents(lines.first())
         val (_, tagName) = HtmlTag.tagMatcher.find(lines.first())!!.destructured
-        parseTypes(lines.drop(skip), accu + HtmlTag(tagName, attributes, parents))
+        parseTypes(
+            lines.drop(skip), accu + HtmlTag(
+                tagName,
+                attributes.filter { it.name != "className" },
+                parents
+            )
+        )
     } else parseTypes(lines.drop(1), accu)
 
 fun cleanUnknownParents(tag: HtmlTag, elements: Map<String, HtmlTag>): HtmlTag =
@@ -82,7 +98,8 @@ tailrec fun enrichMissingAttributes(
         if (tag.attributes.isNotEmpty()) accu + listOf(
             Attribute(
                 "// inherited attributes from supertype ${tag.name}",
-                "Comment"
+                "Comment",
+                ""
             )
         ) + tag.attributes else accu
     )
@@ -108,19 +125,18 @@ fun main(args: Array<String>) {
             .forEach { tag ->
                 appendLine()
                 appendLine("// ${tag.name} attributes")
-                tag.attributes.forEach { (name, type) ->
-                    val htmlAttrName = name.lowercase()
-                    when (type) {
+                tag.attributes.forEach { (name, typeKt, typeHtml) ->
+                    when (typeKt) {
                         "Boolean" -> {
-                            appendLine("""fun Tag<${tag.name}>.$name(value: $type, trueValue: String = "") = attr("$htmlAttrName", value, trueValue)""")
-                            appendLine("""fun Tag<${tag.name}>.$name(value: Flow<$type>, trueValue: String = "") = attr("$htmlAttrName", value, trueValue)""")
+                            appendLine("""fun Tag<${tag.name}>.$name(value: $typeKt, trueValue: String = "") = attr("$typeHtml", value, trueValue)""")
+                            appendLine("""fun Tag<${tag.name}>.$name(value: Flow<$typeKt>, trueValue: String = "") = attr("$typeHtml", value, trueValue)""")
                         }
                         "Comment" -> {
                             appendLine(name)
                         }
                         else -> {
-                            appendLine("""fun Tag<${tag.name}>.$name(value: $type) = attr("$htmlAttrName", value)""")
-                            appendLine("""fun Tag<${tag.name}>.$name(value: Flow<$type>) = attr("$htmlAttrName", value)""")
+                            appendLine("""fun Tag<${tag.name}>.$name(value: $typeKt) = attr("$typeHtml", value)""")
+                            appendLine("""fun Tag<${tag.name}>.$name(value: Flow<$typeKt>) = attr("$typeHtml", value)""")
                         }
                     }
                 }
