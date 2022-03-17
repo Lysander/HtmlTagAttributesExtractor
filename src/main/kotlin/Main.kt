@@ -116,34 +116,24 @@ fun parse(lines: List<String>): List<HtmlTag> {
 }
 
 interface FunGenerator {
-    fun generateAttribute(builder: StringBuilder, tag: HtmlTag, attr: Attribute)
-    fun generateBooleanAttribute(builder: StringBuilder, tag: HtmlTag, attr: Attribute)
+    fun generateAttribute(tag: HtmlTag, attr: Attribute): String
+    fun generateBooleanAttribute(tag: HtmlTag, attr: Attribute): String
 }
 
 class SimpleAttrGenerator : FunGenerator {
-    override fun generateAttribute(builder: StringBuilder, tag: HtmlTag, attr: Attribute) {
-        builder.apply {
-            appendLine(
-                """
-                fun Tag<${tag.name}>.${attr.name}(value: ${attr.typeKt}) = attr("${attr.typeHtml}", value)
-                fun Tag<${tag.name}>.${attr.name}(value: Flow<${attr.typeKt}>) = attr("${attr.typeHtml}", value)
-                    
-                """.trimIndent()
-            )
-        }
-    }
+    override fun generateAttribute(tag: HtmlTag, attr: Attribute) =
+        """
+        fun Tag<${tag.name}>.${attr.name}(value: ${attr.typeKt}) = attr("${attr.typeHtml}", value)
+        fun Tag<${tag.name}>.${attr.name}(value: Flow<${attr.typeKt}>) = attr("${attr.typeHtml}", value)
+            
+        """.trimIndent()
 
-    override fun generateBooleanAttribute(builder: StringBuilder, tag: HtmlTag, attr: Attribute) {
-        builder.apply {
-            appendLine(
-                """ 
-                fun Tag<${tag.name}>.${attr.name}(value: ${attr.typeKt}, trueValue: String = "") = attr("${attr.typeHtml}", value, trueValue)
-                fun Tag<${tag.name}>.${attr.name}(value: Flow<${attr.typeKt}>, trueValue: String = "") = attr("${attr.typeHtml}", value, trueValue)
-                
-                """.trimIndent()
-            )
-        }
-    }
+    override fun generateBooleanAttribute(tag: HtmlTag, attr: Attribute) =
+        """ 
+        fun Tag<${tag.name}>.${attr.name}(value: ${attr.typeKt}, trueValue: String = "") = attr("${attr.typeHtml}", value, trueValue)
+        fun Tag<${tag.name}>.${attr.name}(value: Flow<${attr.typeKt}>, trueValue: String = "") = attr("${attr.typeHtml}", value, trueValue)
+        
+        """.trimIndent()
 }
 
 /**
@@ -175,44 +165,34 @@ class SimpleAttrGenerator : FunGenerator {
  * ```
  */
 class SpecialDomApiAttrGenerator : FunGenerator {
-    override fun generateAttribute(builder: StringBuilder, tag: HtmlTag, attr: Attribute) {
-        builder.apply {
-            appendLine(
-                """
-                fun Tag<${tag.name}>.${attr.name}(value: ${attr.typeKt}) {
-                    domNode.${attr.name} = value
-                    domNode.default${attr.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }} = value
-                    domNode.setAttribute("${attr.typeHtml}", ${attr.valueAsString})
-                }
-                
-                fun Tag<${tag.name}>.${attr.name}(value: Flow<${attr.typeKt}>) {
-                    mountSimple(job, value) { v -> ${attr.name}(v) }
-                }
-
-                """.trimIndent()
-            )
+    override fun generateAttribute(tag: HtmlTag, attr: Attribute) =
+        """
+        fun Tag<${tag.name}>.${attr.name}(value: ${attr.typeKt}) {
+            domNode.${attr.name} = value
+            domNode.default${attr.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }} = value
+            domNode.setAttribute("${attr.typeHtml}", ${attr.valueAsString})
         }
-    }
-
-    override fun generateBooleanAttribute(builder: StringBuilder, tag: HtmlTag, attr: Attribute) {
-        builder.apply {
-            appendLine(
-                """
-                fun Tag<${tag.name}>.${attr.name}(value: ${attr.typeKt}, trueValue: String = "") {
-                    domNode.${attr.name} = value
-                    domNode.default${attr.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }} = value
-                    if (value) domNode.setAttribute("${attr.typeHtml}", trueValue)
-                    else domNode.removeAttribute("${attr.typeHtml}")
-                }
-                
-                fun Tag<${tag.name}>.${attr.name}(value: Flow<${attr.typeKt}>, trueValue: String = "") {
-                    mountSimple(job, value) { v -> ${attr.name}(v, trueValue) }
-                }
-
-                """.trimIndent()
-            )
+        
+        fun Tag<${tag.name}>.${attr.name}(value: Flow<${attr.typeKt}>) {
+            mountSimple(job, value) { v -> ${attr.name}(v) }
         }
-    }
+
+        """.trimIndent()
+
+    override fun generateBooleanAttribute(tag: HtmlTag, attr: Attribute) =
+        """
+        fun Tag<${tag.name}>.${attr.name}(value: ${attr.typeKt}, trueValue: String = "") {
+            domNode.${attr.name} = value
+            domNode.default${attr.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }} = value
+            if (value) domNode.setAttribute("${attr.typeHtml}", trueValue)
+            else domNode.removeAttribute("${attr.typeHtml}")
+        }
+        
+        fun Tag<${tag.name}>.${attr.name}(value: Flow<${attr.typeKt}>, trueValue: String = "") {
+            mountSimple(job, value) { v -> ${attr.name}(v, trueValue) }
+        }
+
+        """.trimIndent()
 }
 
 class DelegatingFunGenerator(
@@ -230,21 +210,20 @@ class DelegatingFunGenerator(
         ("HTMLTextAreaElement" to "value"),
     )
 
-    override fun generateAttribute(builder: StringBuilder, tag: HtmlTag, attr: Attribute) {
+    override fun generateAttribute(tag: HtmlTag, attr: Attribute) =
         if (specialDomApiAttributes.contains(tag.name to attr.name)) {
-            specialGenerator.generateAttribute(builder, tag, attr)
+            specialGenerator.generateAttribute(tag, attr)
         } else {
-            simpleGenerator.generateAttribute(builder, tag, attr)
+            simpleGenerator.generateAttribute(tag, attr)
         }
-    }
 
-    override fun generateBooleanAttribute(builder: StringBuilder, tag: HtmlTag, attr: Attribute) {
+
+    override fun generateBooleanAttribute(tag: HtmlTag, attr: Attribute) =
         if (specialDomApiAttributes.contains(tag.name to attr.name)) {
-            specialGenerator.generateBooleanAttribute(builder, tag, attr)
+            specialGenerator.generateBooleanAttribute(tag, attr)
         } else {
-            simpleGenerator.generateBooleanAttribute(builder, tag, attr)
+            simpleGenerator.generateBooleanAttribute(tag, attr)
         }
-    }
 }
 
 fun main(args: Array<String>) {
@@ -268,11 +247,13 @@ fun main(args: Array<String>) {
                 """.trimMargin()
                 )
                 tag.attributes.forEach { attr ->
-                    when (attr.typeKt) {
-                        "Boolean" -> generator.generateBooleanAttribute(this, tag, attr)
-                        "Comment" -> appendLine(attr.name)
-                        else -> generator.generateAttribute(this, tag, attr)
-                    }
+                    appendLine(
+                        when (attr.typeKt) {
+                            "Boolean" -> generator.generateBooleanAttribute(tag, attr)
+                            "Comment" -> attr.name
+                            else -> generator.generateAttribute(tag, attr)
+                        }
+                    )
                 }
             }
     })
