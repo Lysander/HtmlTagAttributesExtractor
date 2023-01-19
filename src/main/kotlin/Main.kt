@@ -33,24 +33,27 @@ tailrec fun parseAttributes(
         if (result == null) parseAttributes(lines.drop(1), skip + 1, accu)
         else {
             val (name, type) = result.destructured
-            parseAttributes(
-                lines.drop(1),
-                skip + 1,
-                accu + Attribute(
-                    when (name) {
-                        "htmlFor" -> "`for`"
-                        "_object" -> "`object`"
-                        else -> name
-                    },
-                    if (type == "dynamic") "String" else type,
-                    when (name) {
-                        "htmlFor" -> "for"
-                        "`as`" -> "as"
-                        "_object" -> "object"
-                        else -> name
-                    }.lowercase()
+            if (name == "text") parseAttributes(lines.drop(1), skip + 1, accu)
+            else {
+                parseAttributes(
+                    lines.drop(1),
+                    skip + 1,
+                    accu + Attribute(
+                        when (name) {
+                            "htmlFor" -> "`for`"
+                            "_object" -> "`object`"
+                            else -> name
+                        },
+                        if (type == "dynamic") "String" else type,
+                        when (name) {
+                            "htmlFor" -> "for"
+                            "`as`" -> "as"
+                            "_object" -> "object"
+                            else -> name
+                        }.lowercase()
+                    )
                 )
-            )
+            }
         }
     }
 
